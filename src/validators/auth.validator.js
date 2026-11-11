@@ -41,7 +41,6 @@ export const signupSchema = z.object({
   }
 );
 
-
 export const loginSchema = z.object({
   email: z
     .string()
@@ -56,4 +55,47 @@ export const loginSchema = z.object({
   password: z
     .string()
     .min(1, "Password is required")
+});
+
+export const verifyOtpSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email()
+    .refine(
+      email => email.endsWith("@akgec.ac.in"),
+      "Only official AKGEC email addresses are allowed"
+    ),
+
+  otp: z
+    .string()
+    .regex(/^[0-9]{6}$/, "OTP must contain exactly 6 digits")
+});
+
+export const resendOtpSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email()
+    .refine(
+      email => email.endsWith("@akgec.ac.in"),
+      "Only official AKGEC email addresses are allowed"
+    )
+});
+
+export const googleAuthSchema = z.object({
+  idToken: z
+    .string()
+    .min(1, "Google ID token is required"),
+
+  studentNumber: z
+    .string()
+    .trim()
+    .regex(
+      /^[0-9]{3,20}$/,
+      "Student number must contain 3 to 20 digits only"
+    )
+    .optional()
 });

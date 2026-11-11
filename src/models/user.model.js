@@ -1,3 +1,4 @@
+
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
@@ -12,8 +13,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
-      uppercase: true,
-      trim: true
+      trim: true,
+      match: /^[0-9]{3,20}$/
     },
 
     email: {
@@ -26,8 +27,23 @@ const userSchema = new mongoose.Schema(
 
     password: {
       type: String,
-      required: true,
+      required: false,
+      default: null,
       select: false
+    },
+
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      default: undefined,
+      select: false
+    },
+
+    authProvider: {
+      type: String,
+      enum: ["LOCAL", "GOOGLE", "BOTH"],
+      default: "LOCAL"
     },
 
     role: {
