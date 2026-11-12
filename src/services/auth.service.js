@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import Session from "../models/session.model.js";
 import { generateAccessToken, generateRefreshToken } from "../utils/token.util.js";
 import { OAuth2Client } from "google-auth-library";
+import { findEligibleMentor } from "./mentorRegistry.service.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -15,6 +16,33 @@ const hashRefreshToken = (token) => {
     .createHash("sha256")
     .update(token)
     .digest("hex");
+};
+
+const createAuthError = (message, statusCode) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
+const verifyMentorEligibility = async ({
+  email,
+  studentNumber
+}) => {
+  const mentor = await findEligibleMentor({
+    email,
+    studentNumber
+  });
+
+  if (!mentor || !mentor.isEligible) {
+    const error = new Error(
+      "You are not an eligible society mentor. Please check your registered email and student number."
+    );
+
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return mentor;
 };
 
 const createAuthSession = async (user) => {
@@ -53,6 +81,21 @@ const createAuthSession = async (user) => {
 
 export const registerStudent = async (data) => {
   const email = data.email.toLowerCase().trim();
+  const studentNumber = data.studentNumber.trim();
+  const requestedRole = data.role || "STUDENT";
+
+  if (!["STUDENT", "MENTOR"].includes(requestedRole)) {
+    const error = new Error("Invalid account role");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (requestedRole === "MENTOR") {
+    await verifyMentorEligibility({
+      email,
+      studentNumber
+    });
+  }
 
   const existingEmail = await User.findOne({ email });
 
@@ -63,7 +106,7 @@ export const registerStudent = async (data) => {
   }
 
   const existingStudent = await User.findOne({
-    studentNumber: data.studentNumber
+    studentNumber
   });
 
   if (existingStudent) {
@@ -77,11 +120,11 @@ export const registerStudent = async (data) => {
   try {
     const newStudent = await User.create({
       fullName: data.fullName,
-      studentNumber: data.studentNumber,
+      studentNumber,
       email,
       password: hashedPassword,
       authProvider: "LOCAL",
-      role: "STUDENT",
+      role: requestedRole,
       isVerified: false
     });
 
@@ -107,7 +150,11 @@ export const registerStudent = async (data) => {
   }
 };
 
-export const loginUser = async ({ email, password }) => {
+export const loginUser = async ({
+  email,
+  password,
+  role
+}) => {
   const user = await User.findOne({
     email: email.toLowerCase().trim()
   }).select("+password");
@@ -120,8 +167,18 @@ export const loginUser = async ({ email, password }) => {
     throw new Error("Your account is inactive");
   }
 
+  if (user.role !== role) {
+    const error = new Error(
+      `This account is registered as ${user.role}. Please select the correct role.`
+    );
+    error.statusCode = 403;
+    throw error;
+  }
+
   if (!user.password) {
-    const error = new Error("This account uses Google sign-in. Please continue with Google.");
+    const error = new Error(
+      "This account uses Google sign-in. Please continue with Google."
+    );
     error.statusCode = 400;
     throw error;
   }
@@ -143,19 +200,30 @@ export const loginUser = async ({ email, password }) => {
     throw error;
   }
 
+  if (user.role === "MENTOR") {
+    await verifyMentorEligibility({
+      email: user.email,
+      studentNumber: user.studentNumber
+    });
+  }
+
   return createAuthSession(user);
 };
 
 export const googleAuthUser = async ({
   idToken,
-  studentNumber
+  studentNumber,
+  role
 }) => {
-
   if (!process.env.GOOGLE_CLIENT_ID) {
-    const error = new Error(
-      "Google OAuth is not configured"
-    );
+    const error = new Error("Google OAuth is not configured");
     error.statusCode = 500;
+    throw error;
+  }
+
+  if (!["STUDENT", "MENTOR"].includes(role)) {
+    const error = new Error("Invalid account role");
+    error.statusCode = 400;
     throw error;
   }
 
@@ -168,7 +236,6 @@ export const googleAuthUser = async ({
     });
 
     payload = ticket.getPayload();
-
   } catch {
     const error = new Error("Invalid or expired Google ID token");
     error.statusCode = 401;
@@ -181,9 +248,7 @@ export const googleAuthUser = async ({
     !payload.email ||
     payload.email_verified !== true
   ) {
-    const error = new Error(
-      "Google email must be verified"
-    );
+    const error = new Error("Google email must be verified");
     error.statusCode = 403;
     throw error;
   }
@@ -198,18 +263,45 @@ export const googleAuthUser = async ({
     throw error;
   }
 
+  if (role === "MENTOR" && studentNumber) {
+    await verifyMentorEligibility({
+      email,
+      studentNumber
+    });
+  }
+
   let user = await User.findOne({
     googleId: payload.sub
   }).select("+googleId");
 
   if (user) {
-
     if (user.email !== email) {
-      throw new Error("Google account mismatch");
+      throw createAuthError(
+        "Google account mismatch",
+        403
+      );
+    }
+
+    if (user.role !== role) {
+      const error = new Error(
+        `This account is registered as ${user.role}. Please select the correct role.`
+      );
+      error.statusCode = 403;
+      throw error;
     }
 
     if (!user.isActive || !user.isVerified) {
-      throw new Error("Your account is unavailable");
+      throw createAuthError(
+        "Your account is unavailable",
+        403
+      );
+    }
+
+    if (user.role === "MENTOR") {
+      await verifyMentorEligibility({
+        email: user.email,
+        studentNumber: user.studentNumber
+      });
     }
 
     return createAuthSession(user);
@@ -218,10 +310,9 @@ export const googleAuthUser = async ({
   user = await User.findOne({ email }).select("+googleId");
 
   if (user) {
-
-    if (user.role !== "STUDENT") {
+    if (user.role !== role) {
       const error = new Error(
-        "Please contact an administrator to link Google sign-in"
+        `This account is registered as ${user.role}. Please select the correct role.`
       );
       error.statusCode = 403;
       throw error;
@@ -247,6 +338,13 @@ export const googleAuthUser = async ({
       throw error;
     }
 
+    if (user.role === "MENTOR") {
+      await verifyMentorEligibility({
+        email: user.email,
+        studentNumber: user.studentNumber
+      });
+    }
+
     user.googleId = payload.sub;
     user.authProvider = user.password ? "BOTH" : "GOOGLE";
 
@@ -260,7 +358,8 @@ export const googleAuthUser = async ({
       requiresStudentNumber: true,
       googleProfile: {
         fullName: payload.name || "",
-        email
+        email,
+        role
       }
     };
   }
@@ -271,6 +370,13 @@ export const googleAuthUser = async ({
     );
     error.statusCode = 400;
     throw error;
+  }
+
+  if (role === "MENTOR") {
+    await verifyMentorEligibility({
+      email,
+      studentNumber
+    });
   }
 
   const existingStudent = await User.findOne({
@@ -292,11 +398,10 @@ export const googleAuthUser = async ({
       email,
       googleId: payload.sub,
       authProvider: "GOOGLE",
-      role: "STUDENT",
+      role,
       isActive: true,
       isVerified: true
     });
-
   } catch (error) {
     if (error.code === 11000) {
       const conflict = new Error(
@@ -305,7 +410,6 @@ export const googleAuthUser = async ({
       conflict.statusCode = 409;
       throw conflict;
     }
-
     throw error;
   }
   return createAuthSession(user);
@@ -357,6 +461,13 @@ export const refreshUserToken = async (refreshToken) => {
     throw new Error("Account is unavailable");
   }
 
+  if (user.role === "MENTOR") {
+    await verifyMentorEligibility({
+      email: user.email,
+      studentNumber: user.studentNumber
+    });
+  }
+
   const newAccessToken = generateAccessToken(user);
 
   const newRefreshToken = generateRefreshToken(user, session._id);
@@ -377,7 +488,7 @@ export const refreshUserToken = async (refreshToken) => {
       $set: {
         refreshTokenHash: newTokenHash,
         expiresAt: new Date(
-          Date.now() + SESSION_DURATION 
+          Date.now() + SESSION_DURATION
         )
       }
     },

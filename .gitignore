@@ -133,3 +133,6 @@ dist
 # Serverless Webpack directories
 .webpack/
 
+
+
+data/

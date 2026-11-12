@@ -1,3 +1,4 @@
+
 import { z } from "zod";
 
 export const signupSchema = z.object({
@@ -32,7 +33,9 @@ export const signupSchema = z.object({
     .min(8, "Password must be at least 8 characters")
     .max(72, "Password must not exceed 72 characters"),
 
-  confirmPassword: z.string()
+  confirmPassword: z.string(),
+
+  role: z.enum(["STUDENT", "MENTOR"])
 }).refine(
   (data) => data.password === data.confirmPassword,
   {
@@ -54,7 +57,9 @@ export const loginSchema = z.object({
 
   password: z
     .string()
-    .min(1, "Password is required")
+    .min(1, "Password is required"),
+
+  role: z.enum(["STUDENT", "MENTOR"])
 });
 
 export const verifyOtpSchema = z.object({
@@ -89,6 +94,8 @@ export const googleAuthSchema = z.object({
   idToken: z
     .string()
     .min(1, "Google ID token is required"),
+
+  role: z.enum(["STUDENT", "MENTOR"]),
 
   studentNumber: z
     .string()

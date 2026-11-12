@@ -22,7 +22,8 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
       lowercase: true,
-      trim: true
+      trim: true,
+      match: /^[^\s@]+@akgec\.ac\.in$/
     },
 
     password: {
@@ -48,8 +49,9 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["STUDENT", "MENTOR", "ADMIN"],
-      default: "STUDENT"
+      enum: ["STUDENT", "MENTOR"],
+      default: "STUDENT",
+      immutable: true
     },
 
     isActive: {
