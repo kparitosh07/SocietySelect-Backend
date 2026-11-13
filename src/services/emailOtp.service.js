@@ -46,7 +46,7 @@ export const sendVerificationOTP = async (email) => {
         existingOTP.resendAvailableAt > new Date()
     ) {
         throw createError(
-            "Please wait before requesting another OTP",429
+            "Please wait before requesting another OTP", 429
         );
     }
 
@@ -224,4 +224,115 @@ export const consumeEmailVerificationToken = async (
     }
 
     return true;
+};
+
+export const sendPasswordResetOTP = async (email, role) => {
+    email = normalizeEmail(email);
+
+    const user = await User.findOne({ email });
+    if (!user || !user.isVerified) {
+        throw createError("No verified account found with this email", 404);
+    }
+
+    if (user.role !== role) {
+        throw createError(
+            `This account is registered as ${user.role}. Please select the correct role.`,
+            403
+        );
+    }
+
+    const existingOTP = await EmailOtp.findOne({ email });
+    if (existingOTP && existingOTP.resendAvailableAt > new Date()) {
+        throw createError("Please wait 60 seconds before requesting another OTP", 429);
+    }
+
+    const otp = generateOTP();
+    const otpHash = hashOTP(otp);
+    const now = Date.now();
+
+    await EmailOtp.findOneAndUpdate(
+        { email },
+        {
+            $set: {
+                otpHash,
+                expiresAt: new Date(now + OTP_EXPIRY),
+                resendAvailableAt: new Date(now + RESEND_COOLDOWN),
+                attempts: 0,
+                verifiedAt: null,
+                verificationTokenHash: null,
+            },
+        },
+        { upsert: true, new: true, runValidators: true }
+    );
+
+    try {
+        await sendEmail({
+            to: email,
+            subject: "SocietySelect AI - Password Reset OTP",
+            text: `Your password reset OTP is ${otp}. It expires in 5 minutes.`,
+            html: `
+        <div style="font-family:Arial;max-width:500px;margin:auto">
+          <h2>SocietySelect AI - Password Reset</h2>
+          <p>Use the following code to reset your account password:</p>
+          <h1 style="letter-spacing:8px">${otp}</h1>
+          <p>This OTP expires in 5 minutes. If you did not request this, please ignore this email.</p>
+        </div>
+      `,
+        });
+    } catch (error) {
+        await EmailOtp.deleteOne({ email, otpHash });
+        throw createError("Unable to send reset OTP. Please try again.", 503);
+    }
+
+    return { message: "Password reset OTP sent to your email" };
+};
+
+export const verifyPasswordResetOTP = async (email, enteredOTP) => {
+    email = normalizeEmail(email);
+
+    const otpRecord = await EmailOtp.findOne({ email }).select("+otpHash");
+    if (!otpRecord) {
+        throw createError("OTP not found. Request a new OTP.", 404);
+    }
+
+    if (otpRecord.expiresAt <= new Date()) {
+        await EmailOtp.deleteOne({ _id: otpRecord._id });
+        throw createError("OTP expired. Request a new OTP.", 400);
+    }
+
+    if (otpRecord.attempts >= MAX_ATTEMPTS) {
+        await EmailOtp.deleteOne({ _id: otpRecord._id });
+        throw createError("Maximum attempts exceeded. Request a new OTP.", 429);
+    }
+
+    const isValid = compareOTP(enteredOTP, otpRecord.otpHash);
+    if (!isValid) {
+        const updated = await EmailOtp.findOneAndUpdate(
+            { _id: otpRecord._id },
+            { $inc: { attempts: 1 } },
+            { new: true }
+        );
+        if (!updated || updated.attempts >= MAX_ATTEMPTS) {
+            await EmailOtp.deleteOne({ _id: otpRecord._id });
+            throw createError("Maximum attempts exceeded. Request a new OTP.", 429);
+        }
+        throw createError("Invalid OTP", 400);
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    await EmailOtp.findOneAndUpdate(
+        { _id: otpRecord._id },
+        {
+            $set: {
+                verifiedAt: new Date(),
+                verificationTokenHash: hashToken(resetToken),
+                expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_EXPIRY),
+            },
+        }
+    );
+
+    return {
+        message: "OTP verified. You can now set a new password.",
+        resetToken,
+    };
 };

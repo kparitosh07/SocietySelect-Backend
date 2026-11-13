@@ -1,6 +1,8 @@
 import { registerStudent, loginUser, googleAuthUser, refreshUserToken } from "../services/auth.service.js";
 
-import { sendVerificationOTP, verifyEmailOTP } from "../services/emailOtp.service.js";
+import { sendVerificationOTP, verifyEmailOTP, sendPasswordResetOTP, verifyPasswordResetOTP } from "../services/emailOtp.service.js";
+
+import { resetUserPassword } from "../services/auth.service.js";
 
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000;
 
@@ -149,6 +151,44 @@ export const resendOTP = async (req, res) => {
     return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message
+    });
+  }
+};
+
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email, role } = req.body;
+    const result = await sendPasswordResetOTP(email, role);
+    return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const verifyResetOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    const result = await verifyPasswordResetOTP(email, otp);
+    return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const result = await resetUserPassword(req.body);
+    return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({
+      success: false,
+      message: error.message,
     });
   }
 };

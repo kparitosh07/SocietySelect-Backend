@@ -220,6 +220,7 @@ export const loginUser = async ({
 export const googleAuthUser = async ({
   idToken,
   studentNumber,
+  domain,
   role
 }) => {
   if (!process.env.GOOGLE_CLIENT_ID) {
@@ -360,7 +361,7 @@ export const googleAuthUser = async ({
     return createAuthSession(user);
   }
 
-  if (!studentNumber) {
+  if (!studentNumber || !domain) {
     return {
       requiresStudentNumber: true,
       googleProfile: {
@@ -403,6 +404,7 @@ export const googleAuthUser = async ({
       fullName: payload.name || email.split("@")[0],
       studentNumber,
       email,
+      domain: domain.trim(),
       googleId: payload.sub,
       authProvider: "GOOGLE",
       role,
@@ -510,4 +512,37 @@ export const refreshUserToken = async (refreshToken) => {
     accessToken: newAccessToken,
     refreshToken: newRefreshToken
   };
+};
+
+export const resetUserPassword = async ({
+  email,
+  role,
+  resetToken,
+  password,
+}) => {
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = await User.findOne({ email: normalizedEmail }).select("+password");
+
+  if (!user) {
+    throw createAuthError("Account not found", 404);
+  }
+
+  if (user.role !== role) {
+    throw createAuthError(
+      `This account is registered as ${user.role}. Please select the correct role.`,
+      403
+    );
+  }
+
+  await consumeEmailVerificationToken(normalizedEmail, resetToken);
+
+  user.password = await bcrypt.hash(password, 12);
+  if (user.authProvider === "GOOGLE") {
+    user.authProvider = "BOTH";
+  }
+  await user.save();
+
+  await Session.deleteMany({ userId: user._id });
+
+  return { message: "Password has been reset successfully" };
 };
