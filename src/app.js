@@ -7,7 +7,10 @@ import authRoutes from "./routes/auth.route.js";
 const app = express();
 
 app.use(cors({
-  origin: process.env.CLIENT_URL,
+  origin: ["http://localhost:5173",
+      "https://bdtech-6thg.vercel.app",
+      process.env.CLIENT_URL
+    ].filter(Boolean),
   credentials: true
 }));
 
