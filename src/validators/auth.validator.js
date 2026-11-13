@@ -28,6 +28,16 @@ export const signupSchema = z.object({
       "Only official AKGEC email addresses are allowed"
     ),
 
+  domain: z
+    .string()
+    .trim()
+    .min(2, "Please select your domain")
+    .max(50, "Domain is too long"),
+
+  emailVerificationToken: z
+    .string()
+    .min(1, "Please verify your email first"),
+
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")

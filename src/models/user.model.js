@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
@@ -67,6 +66,12 @@ const userSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
       default: null
+    },
+
+    domain: {
+      type: String,
+      required: true,
+      trim: true
     }
   },
   { timestamps: true }

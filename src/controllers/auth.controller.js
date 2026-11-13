@@ -1,6 +1,6 @@
-import {registerStudent,loginUser,googleAuthUser,refreshUserTok} from "../services/auth.service.js";
+import { registerStudent, loginUser, googleAuthUser, refreshUserToken } from "../services/auth.service.js";
 
-import {sendVerificationOTP,verifyEmailOTP} from "../services/emailOtp.service.js";
+import { sendVerificationOTP, verifyEmailOTP } from "../services/emailOtp.service.js";
 
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000;
 
@@ -18,26 +18,22 @@ const setRefreshCookie = (res, refreshToken) => {
 
 export const signup = async (req, res) => {
   try {
-    const account = await registerStudent(req.body);
-
-    try {
-      await sendVerificationOTP(account.email);
-    } catch (emailError) {
-      return res.status(emailError.statusCode || 503).json({
-        success: false,
-        accountCreated: true,
-        message:
-          "Account created, but OTP email could not be sent. Please request a new OTP."
-      });
-    }
+    const student = await registerStudent(req.body);
 
     return res.status(201).json({
       success: true,
-      message: "Registration successful. OTP sent to your AKGEC email.",
-      data: account
+      message: "Account created successfully.",
+      data: student
     });
 
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Email or student number already registered"
+      });
+    }
+
     return res.status(error.statusCode || 400).json({
       success: false,
       message: error.message

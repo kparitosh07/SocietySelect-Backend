@@ -6,7 +6,7 @@ import {otpRequestLimiter,otpVerifyLimiter} from "../middleware/otpRateLimit.mid
 
 const router = express.Router();
 
-router.post("/signup",otpRequestLimiter,validate(signupSchema),signup);
+router.post("/signup",validate(signupSchema),signup);
 
 router.post("/login",validate(loginSchema),login);
 
@@ -17,5 +17,7 @@ router.post("/refresh", refreshToken);
 router.post("/verify-otp",otpVerifyLimiter,validate(verifyOtpSchema),verifyOTP);
 
 router.post("/resend-otp",otpRequestLimiter,validate(resendOtpSchema),resendOTP);
+
+router.post("/send-otp",otpRequestLimiter,validate(resendOtpSchema),resendOTP);
 
 export default router;

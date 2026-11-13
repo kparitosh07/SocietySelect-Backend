@@ -29,6 +29,17 @@ const emailOtpSchema = new mongoose.Schema(
     resendAvailableAt: {
       type: Date,
       required: true
+    },
+    
+    verificationTokenHash: {
+      type: String,
+      default: null,
+      select: false
+    },
+
+    verifiedAt: {
+      type: Date,
+      default: null
     }
   },
   {

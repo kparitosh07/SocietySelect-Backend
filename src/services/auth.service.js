@@ -6,6 +6,7 @@ import Session from "../models/session.model.js";
 import { generateAccessToken, generateRefreshToken } from "../utils/token.util.js";
 import { OAuth2Client } from "google-auth-library";
 import { findEligibleMentor } from "./mentorRegistry.service.js";
+import { consumeEmailVerificationToken } from "./emailOtp.service.js";
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -115,6 +116,11 @@ export const registerStudent = async (data) => {
     throw error;
   }
 
+  await consumeEmailVerificationToken(
+    email,
+    data.emailVerificationToken
+  );
+
   const hashedPassword = await bcrypt.hash(data.password, 12);
 
   try {
@@ -125,7 +131,8 @@ export const registerStudent = async (data) => {
       password: hashedPassword,
       authProvider: "LOCAL",
       role: requestedRole,
-      isVerified: false
+      domain: data.domain,
+      isVerified: true
     });
 
     return {
