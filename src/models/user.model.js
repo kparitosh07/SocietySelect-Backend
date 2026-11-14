@@ -72,7 +72,49 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true
-    }
+    },
+
+    branch: {
+      type: String,
+      trim: true,
+      default: "CSE",
+    },
+
+    year: {
+      type: String,
+      trim: true,
+      default: "2nd Year",
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: 300,
+      default: "",
+    },
+
+    skills: {
+      type: [String],
+      default: [],
+    },
+
+    githubUsername: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    probationStatus: {
+      type: String,
+      enum: ["APPLICANT", "ON_PROBATION", "SELECTED", "REJECTED"],
+      default: "APPLICANT",
+    },
   },
   { timestamps: true }
 );
