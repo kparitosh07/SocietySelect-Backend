@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 import User from "../models/user.model.js";
 
 export const getStudentProfile = async (userId) => {
