@@ -9,6 +9,7 @@ import studentOverviewRoutes from "./routes/studentOverview.route.js";
 import applicationRoutes from "./routes/application.route.js";
 import taskRoutes from "./routes/task.route.js";
 import mentorRoutes from "./routes/mentor.route.js";
+import interviewRoutes from "./routes/interview.route.js";
 
 const app = express();
 
@@ -29,11 +30,20 @@ app.use("/api/student", studentOverviewRoutes);
 app.use("/api/application", applicationRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/mentor", mentorRoutes);
+app.use("/api/interviews", interviewRoutes);
 
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
     message: "Welcome to SocietySelect AI Backend"
+  });
+});
+
+app.use((err, req, res, next) => {
+  console.error("API Error:", err.message);
+  res.status(err.statusCode || 500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
   });
 });
 
