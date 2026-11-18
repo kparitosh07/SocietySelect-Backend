@@ -5,14 +5,19 @@ export const verifyToken = (req, res, next) => {
   const token = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
 
   if (!token) {
-    return res.status(401).json({ message: "Unauthorized: Token missing" });
+    return res.status(401).json({ success: false, message: "Unauthorized: Token missing" });
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    req.user = decoded; 
+    const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_ACCESS_SECRET;
+    const decoded = jwt.verify(token, secret);
+    req.user = {
+      ...decoded,
+      id: decoded.sub || decoded.id,
+      _id: decoded.sub || decoded.id,
+    };
     next();
   } catch (err) {
-    return res.status(401).json({ message: "Invalid or expired token" });
+    return res.status(401).json({ success: false, message: "Invalid or expired token" });
   }
 };

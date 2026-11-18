@@ -16,11 +16,14 @@ export const updateStudentProfile = async (userId, updateData) => {
         "fullName",
         "domain",
         "branch",
+        "section",
+        "rollNo",
         "year",
         "phone",
         "bio",
         "skills",
         "githubUsername",
+        "githubUrl",
     ];
 
     const sanitizedUpdate = {};

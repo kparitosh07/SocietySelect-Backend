@@ -8,6 +8,7 @@ import profileRoutes from "./routes/profile.route.js";
 import studentOverviewRoutes from "./routes/studentOverview.route.js";
 import applicationRoutes from "./routes/application.route.js";
 import taskRoutes from "./routes/task.route.js";
+import mentorRoutes from "./routes/mentor.route.js";
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/student", studentOverviewRoutes);
 app.use("/api/application", applicationRoutes);
 app.use("/api/tasks", taskRoutes);
+app.use("/api/mentor", mentorRoutes);
 
 app.get("/", (req, res) => {
   res.status(200).json({

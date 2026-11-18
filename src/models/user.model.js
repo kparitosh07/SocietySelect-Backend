@@ -80,6 +80,18 @@ const userSchema = new mongoose.Schema(
       default: "CSE",
     },
 
+    section: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    rollNo: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     year: {
       type: String,
       trim: true,
@@ -105,6 +117,12 @@ const userSchema = new mongoose.Schema(
     },
 
     githubUsername: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    githubUrl: {
       type: String,
       trim: true,
       default: "",

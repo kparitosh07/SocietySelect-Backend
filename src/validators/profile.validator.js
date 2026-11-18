@@ -4,6 +4,8 @@ export const updateProfileSchema = z.object({
     fullName: z.string().trim().min(2, "Name must be at least 2 characters").optional(),
     domain: z.string().trim().min(2, "Domain is required").optional(),
     branch: z.string().trim().optional(),
+    section: z.string().trim().max(10, "Section is too long").optional(),
+    rollNo: z.string().trim().max(30, "Roll number is too long").optional(),
     year: z.string().trim().optional(),
     phone: z
         .string()
@@ -13,6 +15,12 @@ export const updateProfileSchema = z.object({
     bio: z.string().trim().max(300, "Bio cannot exceed 300 characters").optional(),
     skills: z.array(z.string().trim()).optional(),
     githubUsername: z.string().trim().optional(),
+    githubUrl: z
+        .string()
+        .trim()
+        .url("Please enter a valid GitHub URL")
+        .or(z.literal(""))
+        .optional(),
 });
 
 export const changePasswordSchema = z
