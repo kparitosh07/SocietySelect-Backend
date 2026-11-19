@@ -1,5 +1,6 @@
 import AttendanceSession from "../models/attendance.model.js";
 import User from "../models/user.model.js";
+import { createAttendanceStartedNotifications } from "./notification.service.js";
 
 const createHttpError = (statusCode, message) => {
   const err = new Error(message);
@@ -137,6 +138,12 @@ export const startAttendanceSession = async (mentorId, society = "SocietySelect"
       percentage: 0,
     },
   });
+
+  const mentorUser = await User.findById(mentorId).select("fullName").lean();
+    await createAttendanceStartedNotifications({
+        mentorName: mentorUser?.fullName || "A mentor",
+        session,
+    });
 
   return session;
 };

@@ -1,5 +1,6 @@
 
 import { z } from "zod";
+import { DOMAINS } from "../constants/domains.js";
 
 const passwordSchema = z
   .string()
@@ -40,11 +41,12 @@ export const signupSchema = z.object({
       "Only official AKGEC email addresses are allowed"
     ),
 
-  domain: z
-    .string()
-    .trim()
-    .min(2, "Please select your domain")
-    .max(50, "Domain is too long"),
+  domain: z.enum(DOMAINS).optional(),
+  domains: z.array(z.enum(DOMAINS))
+    .min(1, "Select at least one domain")
+    .max(DOMAINS.length)
+    .refine((values) => new Set(values).size === values.length, "Choose each domain only once")
+    .optional(),
 
   emailVerificationToken: z
     .string()
@@ -56,6 +58,9 @@ export const signupSchema = z.object({
 
   role: z.enum(["STUDENT", "MENTOR"])
 }).refine(
+  (data) => data.role === "MENTOR" ? Array.isArray(data.domains) && data.domains.length > 0 && !data.domain : Boolean(data.domain) && !data.domains,
+  { message: "Students must select one domain; mentors must select one or more domains", path: ["domain"] }
+).refine(
   (data) => data.password === data.confirmPassword,
   {
     message: "Passwords do not match",
@@ -124,13 +129,20 @@ export const googleAuthSchema = z.object({
       "Student number must contain 3 to 20 digits only"
     )
     .optional(),
-  domain: z
-    .string()
-    .trim()
-    .min(2, "Please enter your domain")
-    .max(50, "Domain is too long")
-    .optional()
-});
+  domain: z.enum(DOMAINS).optional(),
+  domains: z.array(z.enum(DOMAINS))
+    .min(1)
+    .max(DOMAINS.length)
+    .refine((values) => new Set(values).size === values.length, "Choose each domain only once")
+    .optional(),
+}).refine(
+  (data) => {
+    if (!data.studentNumber && !data.domain && !data.domains) return true;
+    if (data.role === "STUDENT") return !data.domains && Boolean(data.domain);
+    return Array.isArray(data.domains) && data.domains.length > 0 && !data.domain;
+  },
+  { message: "Select one domain for students or one or more domains for mentors", path: ["domain"] }
+);
 
 export const forgotPasswordSchema = z.object({
   email: z

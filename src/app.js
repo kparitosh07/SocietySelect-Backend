@@ -11,6 +11,7 @@ import taskRoutes from "./routes/task.route.js";
 import mentorRoutes from "./routes/mentor.route.js";
 import interviewRoutes from "./routes/interview.route.js";
 import attendanceRoutes from "./routes/attendance.route.js";
+import notificationRoutes from "./routes/notification.route.js";
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/mentor", mentorRoutes);
 app.use("/api/interviews", interviewRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.get("/", (req, res) => {
   res.status(200).json({

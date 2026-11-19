@@ -1,6 +1,7 @@
 import User from "../models/user.model.js";
 import Task from "../models/task.model.js";
 import Application from "../models/application.model.js";
+import { createTaskAssignedNotifications } from "./notification.service.js";
 
 const createServiceError = (message, statusCode = 400) => {
   const error = new Error(message);
@@ -10,12 +11,21 @@ const createServiceError = (message, statusCode = 400) => {
 
 const getVerifiedMentor = async (mentorId) => {
   const mentor = await User.findById(mentorId)
-    .select("fullName email studentNumber domain branch year role")
+    .select("fullName email studentNumber domain domains branch year role")
     .lean();
 
   if (!mentor || mentor.role !== "MENTOR") {
     throw createServiceError("Mentor account not found", 404);
   }
+
+  mentor.domains = Array.isArray(mentor.domains) && mentor.domains.length
+    ? mentor.domains
+    : (mentor.domain ? [mentor.domain] : []);
+
+  if (!mentor.domains.length) {
+    throw createServiceError("No domains are assigned to this mentor", 403);
+  }
+  mentor.domain = mentor.domains[0];
 
   return mentor;
 };
@@ -209,7 +219,8 @@ export const getAssignedStudents = async (mentorId, filters = {}) => {
   });
 
   return {
-    domain: mentor.domain,
+    domains: mentor.domains,
+    domain: mentor.domains[0],
     totalStudents: enrichedStudents.length,
     students: enrichedStudents,
   };
@@ -306,6 +317,11 @@ export const createDomainTask = async (mentorId, payload) => {
     assignedBy: mentor._id,
   });
 
+  await createTaskAssignedNotifications({
+    mentorName: mentor.fullName,
+    task,
+  });
+
   return task;
 };
 
@@ -320,7 +336,8 @@ export const listDomainTasksWithSubmissions = async (mentorId) => {
     .lean();
 
   return {
-    domain: mentor.domain,
+    domains: mentor.domains,
+    domain: mentor.domains[0] ,
     totalTasks: tasks.length,
     tasks,
   };

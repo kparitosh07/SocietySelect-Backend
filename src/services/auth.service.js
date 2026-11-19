@@ -75,7 +75,10 @@ const createAuthSession = async (user) => {
       fullName: user.fullName,
       studentNumber: user.studentNumber,
       email: user.email,
-      role: user.role
+      role: user.role,
+      ...(user.role === "MENTOR"
+        ? { domains: user.domains?.length ? user.domains : (user.domain ? [user.domain] : []) }
+        : { domain: user.domain })
     }
   };
 };
@@ -131,7 +134,9 @@ export const registerStudent = async (data) => {
       password: hashedPassword,
       authProvider: "LOCAL",
       role: requestedRole,
-      domain: data.domain,
+      ...(requestedRole === "MENTOR"
+        ? { domains: data.domains }
+        : { domain: data.domain }),
       isVerified: true
     });
 
@@ -221,6 +226,7 @@ export const googleAuthUser = async ({
   idToken,
   studentNumber,
   domain,
+  domains,
   role
 }) => {
   if (!process.env.GOOGLE_CLIENT_ID) {
@@ -361,7 +367,11 @@ export const googleAuthUser = async ({
     return createAuthSession(user);
   }
 
-  if (!studentNumber || !domain) {
+  const hasValidDomainSelection = role === "MENTOR"
+    ? Array.isArray(domains) && domains.length > 0
+    : Boolean(domain);
+
+  if (!studentNumber || !hasValidDomainSelection) {
     return {
       requiresStudentNumber: true,
       googleProfile: {
@@ -404,7 +414,9 @@ export const googleAuthUser = async ({
       fullName: payload.name || email.split("@")[0],
       studentNumber,
       email,
-      domain: domain.trim(),
+      ...(role === "MENTOR"
+        ? { domains }
+        : { domain }),
       googleId: payload.sub,
       authProvider: "GOOGLE",
       role,

@@ -32,17 +32,23 @@ const deriveInterviewStatus = (application) => {
 // 1. GET /api/interviews
 export const listInterviewCandidates = async (mentorId, filters = {}) => {
   const mentor = await User.findById(mentorId)
-    .select("fullName domain role")
+    .select("fullName domain domains role")
     .lean();
 
   if (!mentor || mentor.role !== "MENTOR") {
     throw createServiceError("Mentor account not found", 404);
   }
 
-  const appQuery = {};
-  if (filters.allDomains !== "true") {
-    appQuery.domain = filters.domain || mentor.domain;
+  const mentorDomains = Array.isArray(mentor.domains) && mentor.domains.length
+    ? mentor.domains
+    : (mentor.domain ? [mentor.domain] : []);
+  if (!mentorDomains.length) throw createServiceError("No domains are assigned to this mentor", 403);
+
+  const requestedDomain = filters.domain;
+  if (requestedDomain && !mentorDomains.includes(requestedDomain)) {
+    throw createServiceError("You do not have access to this domain", 403);
   }
+  const appQuery = { domain: requestedDomain || { $in: mentorDomains } };
 
   const [applications, domainTasks] = await Promise.all([
     Application.find(appQuery)
@@ -52,7 +58,7 @@ export const listInterviewCandidates = async (mentorId, filters = {}) => {
       )
       .sort({ updatedAt: -1 })
       .lean(),
-    Task.find(appQuery.domain ? { domain: appQuery.domain } : {})
+    Task.find({ domain: appQuery.domain })
       .select("domain maxMarks submissions")
       .lean(),
   ]);
@@ -133,7 +139,8 @@ export const listInterviewCandidates = async (mentorId, filters = {}) => {
   };
 
   return {
-    domain: appQuery.domain || "ALL",
+    domains: mentorDomains,
+    domain: requestedDomain || "ALL",
     stats,
     candidates,
   };
@@ -145,10 +152,13 @@ export const scheduleCandidateInterview = async (
   targetId,
   payload
 ) => {
-  const mentor = await User.findById(mentorId).select("fullName domain role").lean();
+  const mentor = await User.findById(mentorId).select("fullName domain domains role").lean();
   if (!mentor || mentor.role !== "MENTOR") {
     throw createServiceError("Mentor account not found", 404);
   }
+  const mentorDomains = Array.isArray(mentor.domains) && mentor.domains.length
+    ? mentor.domains
+    : (mentor.domain ? [mentor.domain] : []);
 
   // Find by Application _id first; if not found, find by Student User _id
   let application = await Application.findById(targetId).populate(
@@ -157,7 +167,7 @@ export const scheduleCandidateInterview = async (
   );
 
   if (!application) {
-    const student = await User.findOne({ _id: targetId, role: "STUDENT" });
+    const student = await User.findOne({ _id: targetId, role: "STUDENT", domain: { $in: mentorDomains } });
     if (!student) {
       throw createServiceError("Candidate or application not found", 404);
     }
@@ -173,6 +183,10 @@ export const scheduleCandidateInterview = async (
       },
       { upsert: true, new: true }
     ).populate("student", "fullName email studentNumber domain");
+  }
+
+  if (!application || !mentorDomains.includes(application.domain)) {
+    throw createServiceError("Candidate is outside your assigned domains", 403);
   }
 
   const meetingLink =
