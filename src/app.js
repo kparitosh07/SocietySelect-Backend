@@ -10,6 +10,7 @@ import applicationRoutes from "./routes/application.route.js";
 import taskRoutes from "./routes/task.route.js";
 import mentorRoutes from "./routes/mentor.route.js";
 import interviewRoutes from "./routes/interview.route.js";
+import attendanceRoutes from "./routes/attendance.route.js";
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use("/api/application", applicationRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/mentor", mentorRoutes);
 app.use("/api/interviews", interviewRoutes);
+app.use("/api/attendance", attendanceRoutes);
 
 app.get("/", (req, res) => {
   res.status(200).json({
