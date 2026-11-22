@@ -76,9 +76,10 @@ const createAuthSession = async (user) => {
       studentNumber: user.studentNumber,
       email: user.email,
       role: user.role,
-      ...(user.role === "MENTOR"
-        ? { domains: user.domains?.length ? user.domains : (user.domain ? [user.domain] : []) }
-        : { domain: user.domain })
+      // ...(user.role === "MENTOR"
+      //   ? { domains: user.domains?.length ? user.domains : (user.domain ? [user.domain] : []) }
+      //   : { domain: user.domain })
+      domain: user.domain
     }
   };
 };
@@ -134,9 +135,10 @@ export const registerStudent = async (data) => {
       password: hashedPassword,
       authProvider: "LOCAL",
       role: requestedRole,
-      ...(requestedRole === "MENTOR"
-        ? { domains: data.domains }
-        : { domain: data.domain }),
+      domain: data.domain,
+      // ...(requestedRole === "MENTOR"
+      //   ? { domains: data.domains }
+      //   : { domain: data.domain }),
       isVerified: true
     });
 
@@ -226,7 +228,7 @@ export const googleAuthUser = async ({
   idToken,
   studentNumber,
   domain,
-  domains,
+  // domains,
   role
 }) => {
   if (!process.env.GOOGLE_CLIENT_ID) {
@@ -367,11 +369,11 @@ export const googleAuthUser = async ({
     return createAuthSession(user);
   }
 
-  const hasValidDomainSelection = role === "MENTOR"
-    ? Array.isArray(domains) && domains.length > 0
-    : Boolean(domain);
+  // const hasValidDomainSelection = role === "MENTOR"
+  //   ? Array.isArray(domains) && domains.length > 0
+  //   : Boolean(domain);
 
-  if (!studentNumber || !hasValidDomainSelection) {
+  if (!studentNumber || !domain) {
     return {
       requiresStudentNumber: true,
       googleProfile: {
@@ -414,9 +416,10 @@ export const googleAuthUser = async ({
       fullName: payload.name || email.split("@")[0],
       studentNumber,
       email,
-      ...(role === "MENTOR"
-        ? { domains }
-        : { domain }),
+      // ...(role === "MENTOR"
+      //   ? { domains }
+      //   : { domain }),
+      domain,
       googleId: payload.sub,
       authProvider: "GOOGLE",
       role,

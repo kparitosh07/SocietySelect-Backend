@@ -70,22 +70,23 @@ const userSchema = new mongoose.Schema(
 
     domain: {
       type: String,
-      required: function () { return this.role === "STUDENT"; },
+      // required: function () { return this.role === "STUDENT"; },
+      required: true,
       trim: true,
       default: undefined,
     },
 
-    domains: {
-      type: [{ type: String, enum: ["Web Development", "App Development", "ML", "Designer"] }],
-      required: false,
-      default: undefined,
-      validate: {
-        validator: function (value) {
-          return this.role !== "MENTOR" || Boolean(this.domain) || (Array.isArray(value) && value.length > 0 && new Set(value).size === value.length);
-        },
-        message: "Mentors must select at least one unique domain",
-      },
-    },
+    // domains: {
+    //   type: [{ type: String, enum: ["Web Development", "App Development", "ML", "Designer"] }],
+    //   required: false,
+    //   default: undefined,
+    //   validate: {
+    //     validator: function (value) {
+    //       return this.role !== "MENTOR" || Boolean(this.domain) || (Array.isArray(value) && value.length > 0 && new Set(value).size === value.length);
+    //     },
+    //     message: "Mentors must select at least one unique domain",
+    //   },
+    // },
 
     branch: {
       type: String,
