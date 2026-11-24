@@ -67,6 +67,33 @@ export const closeSession = async (req, res, next) => {
   }
 };
 
+export const getActiveAttendanceSession = async (req,res,next) => {
+  try {
+    const data =
+      await attendanceService.getActiveAttendanceForStudent(
+        req.user.id
+      );
+
+    res.status(200).json({success: true,...data,});
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const markMyAttendance = async (req,res,next) => {
+  try {
+    const result =
+      await attendanceService.markMyAttendanceAsPresent(
+        req.params.sessionId,
+        req.user.id
+      );
+
+    res.status(200).json({success: true,message: "Attendance marked successfully",...result,});
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getMyAttendance = async (req, res, next) => {
   try {
     const data = await attendanceService.getStudentAttendance(req.user.id);

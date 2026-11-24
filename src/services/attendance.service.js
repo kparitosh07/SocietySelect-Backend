@@ -1,3 +1,4 @@
+
 import AttendanceSession from "../models/attendance.model.js";
 import User from "../models/user.model.js";
 import { createAttendanceStartedNotifications } from "./notification.service.js";
@@ -24,26 +25,32 @@ const formatTimeLabel = (dateObj) =>
 const computeSummary = (entries) => {
   const total = entries.length;
   const present = entries.filter((e) => e.status === "PRESENT").length;
-  const absent = total - present;
-  const percentage = total ? Math.round((present / total) * 100) : 0;
+  const absent = entries.filter((e) => e.status === "ABSENT").length;
+  const percentage = total
+    ? Math.round((present / total) * 100)
+    : 0;
+
   return { total, present, absent, percentage };
 };
 
 export const getMentorAttendanceState = async (mentorId) => {
-  const [allStudents, activeSession, closedSessions] = await Promise.all([
-    User.find({ role: "STUDENT", isActive: true })
-      .select("fullName rollNo studentNumber year branch domain")
-      .sort({ fullName: 1 })
-      .lean(),
-    AttendanceSession.findOne({ status: "OPEN" })
-      .populate("startedBy", "fullName")
-      .lean(),
-    AttendanceSession.find({ status: "CLOSED" })
-      .populate("startedBy", "fullName")
-      .sort({ closedAt: -1 })
-      .limit(30)
-      .lean(),
-  ]);
+  const [allStudents, activeSession, closedSessions] =
+    await Promise.all([
+      User.find({ role: "STUDENT", isActive: true })
+        .select("fullName rollNo studentNumber year branch domain")
+        .sort({ fullName: 1 })
+        .lean(),
+
+      AttendanceSession.findOne({ status: "OPEN" })
+        .populate("startedBy", "fullName")
+        .lean(),
+
+      AttendanceSession.find({ status: "CLOSED" })
+        .populate("startedBy", "fullName")
+        .sort({ closedAt: -1 })
+        .limit(30)
+        .lean(),
+    ]);
 
   const entryMap = new Map(
     (activeSession?.entries || []).map((entry) => [
@@ -64,29 +71,33 @@ export const getMentorAttendanceState = async (mentorId) => {
   }));
 
   const isOwnedByCurrentMentor = activeSession
-    ? String(activeSession.startedBy?._id || activeSession.startedBy) ===
-      String(mentorId)
+    ? String(
+      activeSession.startedBy?._id || activeSession.startedBy
+    ) === String(mentorId)
     : false;
 
   return {
     session: activeSession
       ? {
-          id: String(activeSession._id),
-          isOpen: true,
-          society: activeSession.society,
-          date: activeSession.dateLabel,
-          startTime: activeSession.startTime,
-          startedBy: activeSession.startedBy?.fullName || "Mentor",
-          isOwnedByCurrentMentor,
-        }
+        id: String(activeSession._id),
+        isOpen: true,
+        society: activeSession.society,
+        date: activeSession.dateLabel,
+        startTime: activeSession.startTime,
+        startedBy:
+          activeSession.startedBy?.fullName || "Mentor",
+        isOwnedByCurrentMentor,
+      }
       : {
-          isOpen: false,
-          date: "",
-          startTime: "",
-          startedBy: null,
-          isOwnedByCurrentMentor: false,
-        },
+        isOpen: false,
+        date: "",
+        startTime: "",
+        startedBy: null,
+        isOwnedByCurrentMentor: false,
+      },
+
     students,
+
     history: closedSessions.map((s) => ({
       id: String(s._id),
       society: s.society,
@@ -102,24 +113,35 @@ export const getMentorAttendanceState = async (mentorId) => {
   };
 };
 
-export const startAttendanceSession = async (mentorId, society = "SocietySelect") => {
-  const existingOpen = await AttendanceSession.findOne({ status: "OPEN" })
+export const startAttendanceSession = async (
+  mentorId,
+  society = "SocietySelect"
+) => {
+  const existingOpen = await AttendanceSession.findOne({
+    status: "OPEN",
+  })
     .populate("startedBy", "fullName")
     .lean();
 
   if (existingOpen) {
-    const ownerName = existingOpen.startedBy?.fullName || "another mentor";
+    const ownerName =
+      existingOpen.startedBy?.fullName || "another mentor";
+
     throw createHttpError(
       409,
       `An attendance session is already active (${ownerName}). Close it before starting a new one.`
     );
   }
 
-  const allStudents = await User.find({ role: "STUDENT", isActive: true })
+  const allStudents = await User.find({
+    role: "STUDENT",
+    isActive: true,
+  })
     .select("_id")
     .lean();
 
   const now = new Date();
+
   const session = await AttendanceSession.create({
     society: society?.trim() || "SocietySelect",
     startedBy: mentorId,
@@ -127,10 +149,12 @@ export const startAttendanceSession = async (mentorId, society = "SocietySelect"
     dateLabel: formatDateLabel(now),
     startTime: formatTimeLabel(now),
     startedAt: now,
+
     entries: allStudents.map((stu) => ({
       student: stu._id,
       status: "PENDING",
     })),
+
     summary: {
       total: allStudents.length,
       present: 0,
@@ -139,27 +163,219 @@ export const startAttendanceSession = async (mentorId, society = "SocietySelect"
     },
   });
 
-  const mentorUser = await User.findById(mentorId).select("fullName").lean();
-    await createAttendanceStartedNotifications({
-        mentorName: mentorUser?.fullName || "A mentor",
-        session,
-    });
+  const mentorUser = await User.findById(mentorId)
+    .select("fullName")
+    .lean();
+
+  await createAttendanceStartedNotifications({
+    mentorName: mentorUser?.fullName || "A mentor",
+    session,
+  });
 
   return session;
 };
 
-export const markStudentAttendance = async (sessionId, mentorId, studentId, status) => {
+export const getActiveAttendanceForStudent = async (
+  studentId
+) => {
+  const session = await AttendanceSession.findOne({
+    status: "OPEN",
+  })
+    .populate("startedBy", "fullName")
+    .lean();
+
+  if (!session) {
+    return {
+      hasActiveSession: false,
+      session: null,
+      attendance: null,
+    };
+  }
+
+  const entry = session.entries.find(
+    (item) => String(item.student) === String(studentId)
+  );
+
+  if (!entry) {
+    throw createHttpError(
+      403,
+      "You are not included in this attendance session."
+    );
+  }
+
+  return {
+    hasActiveSession: true,
+
+    session: {
+      id: String(session._id),
+      society: session.society,
+      date: session.dateLabel,
+      startTime: session.startTime,
+      startedAt: session.startedAt,
+      startedBy:
+        session.startedBy?.fullName || "Mentor",
+      isOpen: true,
+    },
+
+    attendance: {
+      status: entry.status,
+      markedAt: entry.markedAt,
+      markedBy: entry.markedBy,
+    },
+  };
+};
+
+export const markMyAttendanceAsPresent = async (
+  sessionId,
+  studentId
+) => {
+  const sessionExists = await AttendanceSession.findOne({
+    _id: sessionId,
+    status: "OPEN",
+  }).select("_id");
+
+  if (!sessionExists) {
+    const existingSession = await AttendanceSession.findById(
+      sessionId
+    ).select("status");
+
+    if (!existingSession) {
+      throw createHttpError(
+        404,
+        "Attendance session not found."
+      );
+    }
+
+    throw createHttpError(
+      400,
+      "Attendance session is already closed."
+    );
+  }
+
+  const now = new Date();
+
+  const updatedSession = await AttendanceSession.findOneAndUpdate(
+    {
+      _id: sessionId,
+      status: "OPEN",
+      entries: {
+        $elemMatch: {
+          student: studentId,
+          status: "PENDING",
+        },
+      },
+    },
+    {
+      $set: {
+        "entries.$[entry].status": "PRESENT",
+        "entries.$[entry].markedBy": studentId,
+        "entries.$[entry].markedAt": now,
+      },
+    },
+    {
+      new: true,
+      arrayFilters: [
+        {
+          "entry.student": studentId,
+          "entry.status": "PENDING",
+        },
+      ],
+    }
+  );
+
+  if (!updatedSession) {
+    const latestSession = await AttendanceSession.findById(
+      sessionId
+    );
+
+    if (!latestSession) {
+      throw createHttpError(
+        404,
+        "Attendance session not found."
+      );
+    }
+
+    if (latestSession.status !== "OPEN") {
+      throw createHttpError(
+        400,
+        "Attendance session is already closed."
+      );
+    }
+
+    const existingEntry = latestSession.entries.find(
+      (entry) =>
+        String(entry.student) === String(studentId)
+    );
+
+    if (!existingEntry) {
+      throw createHttpError(
+        403,
+        "You are not included in this attendance session."
+      );
+    }
+
+    if (existingEntry.status === "PRESENT") {
+      throw createHttpError(
+        409,
+        "You have already marked your attendance."
+      );
+    }
+
+    throw createHttpError(
+      400,
+      "Unable to mark attendance. Please try again."
+    );
+  }
+
+  const summary = computeSummary(updatedSession.entries);
+
+  await AttendanceSession.updateOne(
+    {
+      _id: sessionId,
+      status: "OPEN",
+    },
+    {
+      $set: { summary },
+    }
+  );
+
+  return {
+    sessionId: String(sessionId),
+    studentId: String(studentId),
+    status: "PRESENT",
+    markedAt: now,
+    message: "Your attendance has been marked successfully.",
+    summary,
+  };
+};
+
+export const markStudentAttendance = async (
+  sessionId,
+  mentorId,
+  studentId,
+  status
+) => {
   if (!["PRESENT", "ABSENT"].includes(status)) {
-    throw createHttpError(400, "Status must be PRESENT or ABSENT");
+    throw createHttpError(
+      400,
+      "Status must be PRESENT or ABSENT"
+    );
   }
 
   const session = await AttendanceSession.findById(sessionId);
+
   if (!session) {
-    throw createHttpError(404, "Attendance session not found");
+    throw createHttpError(
+      404,
+      "Attendance session not found"
+    );
   }
 
   if (session.status !== "OPEN") {
-    throw createHttpError(400, "Session is already closed");
+    throw createHttpError(
+      400,
+      "Session is already closed"
+    );
   }
 
   if (String(session.startedBy) !== String(mentorId)) {
@@ -187,6 +403,7 @@ export const markStudentAttendance = async (sessionId, mentorId, studentId, stat
   }
 
   session.summary = computeSummary(session.entries);
+
   await session.save();
 
   return {
@@ -197,14 +414,24 @@ export const markStudentAttendance = async (sessionId, mentorId, studentId, stat
   };
 };
 
-export const closeAttendanceSession = async (sessionId, mentorId) => {
+export const closeAttendanceSession = async (
+  sessionId,
+  mentorId
+) => {
   const session = await AttendanceSession.findById(sessionId);
+
   if (!session) {
-    throw createHttpError(404, "Attendance session not found");
+    throw createHttpError(
+      404,
+      "Attendance session not found"
+    );
   }
 
   if (session.status !== "OPEN") {
-    throw createHttpError(400, "Session is already closed");
+    throw createHttpError(
+      400,
+      "Session is already closed"
+    );
   }
 
   if (String(session.startedBy) !== String(mentorId)) {
@@ -215,9 +442,11 @@ export const closeAttendanceSession = async (sessionId, mentorId) => {
   }
 
   const now = new Date();
+
   session.entries = session.entries.map((entry) => ({
     ...entry.toObject(),
-    status: entry.status === "PRESENT" ? "PRESENT" : "ABSENT",
+    status:
+      entry.status === "PRESENT" ? "PRESENT" : "ABSENT",
   }));
 
   session.status = "CLOSED";
@@ -248,12 +477,20 @@ export const getStudentAttendance = async (studentId) => {
 
   const records = sessions
     .map((s) => {
-      const entry = s.entries.find((e) => String(e.student) === String(studentId));
+      const entry = s.entries.find(
+        (e) => String(e.student) === String(studentId)
+      );
+
       if (!entry) return null;
 
-      const refDate = s.closedAt ? new Date(s.closedAt) : new Date(s.createdAt);
+      const refDate = s.closedAt
+        ? new Date(s.closedAt)
+        : new Date(s.createdAt);
+
       const isoDate = refDate.toISOString().slice(0, 10);
-      const day = refDate.toLocaleDateString("en-IN", { weekday: "long" });
+      const day = refDate.toLocaleDateString("en-IN", {
+        weekday: "long",
+      });
 
       return {
         id: `${s._id}_${studentId}`,
@@ -261,15 +498,20 @@ export const getStudentAttendance = async (studentId) => {
         date: isoDate,
         day,
         time: s.startTime || "09:00 AM",
-        status: entry.status === "PRESENT" ? "Present" : "Absent",
+        status:
+          entry.status === "PRESENT" ? "Present" : "Absent",
       };
     })
     .filter(Boolean);
 
   const total = records.length;
-  const present = records.filter((r) => r.status === "Present").length;
+  const present = records.filter(
+    (r) => r.status === "Present"
+  ).length;
   const absent = total - present;
-  const percentage = total ? Math.round((present / total) * 100) : 0;
+  const percentage = total
+    ? Math.round((present / total) * 100)
+    : 0;
 
   return {
     stats: {

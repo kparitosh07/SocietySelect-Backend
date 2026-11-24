@@ -5,6 +5,8 @@ import {
   markAttendance,
   closeSession,
   getMyAttendance,
+  getActiveAttendanceSession,
+  markMyAttendance,
 } from "../controllers/attendance.controller.js";
 import { verifyToken } from "../middleware/auth.middleware.js";
 import { requireRole } from "../middleware/role.middleware.js";
@@ -25,7 +27,8 @@ router.post(
   requireRole("MENTOR"),
   closeSession
 );
-
+router.get("/active",requireRole("STUDENT"),getActiveAttendanceSession);
+router.post("/sessions/:sessionId/mark-present",requireRole("STUDENT"),markMyAttendance);
 router.get("/me", requireRole("STUDENT"), getMyAttendance);
 
 export default router;
